@@ -17,6 +17,7 @@ import OwnerProperties from "@/pages/owner/properties/index";
 import PropertyForm from "@/pages/owner/properties/form";
 
 import TenantBookings from "@/pages/tenant/bookings";
+import ProfilePage from "@/pages/profile";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +64,13 @@ function Router() {
       <Route path="/tenant/bookings">
         <ProtectedRoute>
           <TenantBookings />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Profile */}
+      <Route path="/profile">
+        <ProtectedRoute>
+          <ProfilePage />
         </ProtectedRoute>
       </Route>
 

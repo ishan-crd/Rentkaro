@@ -28,12 +28,18 @@ pnpm workspace monorepo using TypeScript. RentKaro is a PG (Paying Guest) accomm
 ## Key Features
 
 - Landing page with hero search, platform stats, featured cities, ML-recommended PGs
-- PG search with filters (city, rent range, gender preference, room type, sort)
+- PG search with filters (city, rent range, gender preference, room type, sort by newest/rent/rating/views)
 - Property detail pages with image gallery, amenities, reviews, sentiment analysis scores
-- Owner dashboard with stats, recent inquiries, property management
-- Tenant booking/inquiry system
+- Owner dashboard with 5 stat cards (properties, views, inquiries, approved, avg rating), recent inquiries, quick actions
+- Owner properties page with per-card reviews/inquiries/views counts and availability toggle
+- Tenant booking/inquiry system with status management
 - Session-based auth (register/login as tenant or owner)
 - Review system with simulated sentiment analysis (DistilBERT-style scores)
+- Profile page — update name/phone, view role & member-since info
+- Login page — clickable demo account quick-fill buttons (4 seeded accounts)
+- Full mobile hamburger menu with role-aware nav links
+- 18 properties seeded with reviews across all listings
+- Proper 404 not-found page with navigation links
 
 ## API Routes
 
@@ -41,6 +47,7 @@ pnpm workspace monorepo using TypeScript. RentKaro is a PG (Paying Guest) accomm
 - `POST /api/auth/login` — Login
 - `POST /api/auth/logout` — Logout
 - `GET /api/auth/me` — Get current user
+- `PUT /api/auth/profile` — Update name/phone for logged-in user
 - `GET /api/properties` — List/search properties (filters: city, minRent, maxRent, genderPreference, availability, sortBy, page, limit)
 - `POST /api/properties` — Create property (owner only)
 - `GET /api/properties/recommended` — ML-style recommended properties

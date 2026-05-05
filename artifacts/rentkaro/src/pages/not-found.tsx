@@ -1,21 +1,32 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { Link } from "wouter";
+import { Layout } from "@/components/layout/Layout";
+import { Button } from "@/components/ui/button";
+import { Home, Search } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardContent className="pt-6">
-          <div className="flex mb-4 gap-2">
-            <AlertCircle className="h-8 w-8 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">404 Page Not Found</h1>
-          </div>
-
-          <p className="mt-4 text-sm text-gray-600">
-            Did you forget to add the page to the router?
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <Layout>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center py-20">
+        <div className="w-32 h-32 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-8">
+          <span className="text-6xl font-black text-primary/30">404</span>
+        </div>
+        <h1 className="text-4xl font-extrabold tracking-tight mb-3">Page not found</h1>
+        <p className="text-muted-foreground text-lg max-w-md mx-auto mb-10">
+          We couldn't find the page you were looking for. It may have been moved, deleted, or never existed.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link href="/">
+            <Button size="lg" className="gap-2 w-full sm:w-auto">
+              <Home className="w-4 h-4" /> Go Home
+            </Button>
+          </Link>
+          <Link href="/properties">
+            <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto">
+              <Search className="w-4 h-4" /> Browse Properties
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </Layout>
   );
 }

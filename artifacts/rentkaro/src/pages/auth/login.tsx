@@ -151,6 +151,27 @@ export default function Login() {
                 Create an account
               </Link>
             </div>
+            <div className="w-full border rounded-lg p-3 bg-amber-50 border-amber-200">
+              <p className="text-xs font-semibold text-amber-800 mb-2 text-center">Demo Accounts (password: password123)</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Owner", email: "rahul@example.com" },
+                  { label: "Owner", email: "priya@example.com" },
+                  { label: "Tenant", email: "arjun@example.com" },
+                  { label: "Tenant", email: "sneha@example.com" },
+                ].map(({ label, email }) => (
+                  <button
+                    key={email}
+                    type="button"
+                    onClick={() => { form.setValue("email", email); form.setValue("password", "password123"); }}
+                    className="text-left px-2 py-1.5 rounded-md hover:bg-amber-100 transition-colors border border-amber-200 cursor-pointer"
+                  >
+                    <span className="text-[10px] font-bold text-amber-700 block">{label}</span>
+                    <span className="text-xs text-amber-900 truncate block">{email}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </CardFooter>
         </Card>
       </div>

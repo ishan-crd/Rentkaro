@@ -95,6 +95,7 @@ function FilterPanel({
             <SelectItem value="rent_asc">Rent (Low to High)</SelectItem>
             <SelectItem value="rent_desc">Rent (High to Low)</SelectItem>
             <SelectItem value="rating">Top Rated</SelectItem>
+            <SelectItem value="views">Most Popular</SelectItem>
           </SelectContent>
         </Select>
       </div>

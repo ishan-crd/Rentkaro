@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Home, LayoutDashboard, CalendarDays, LogOut, Menu, X, Search } from "lucide-react";
+import { Home, LayoutDashboard, CalendarDays, LogOut, Menu, Search, UserCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -109,6 +109,9 @@ export function Navbar() {
                     <p className="text-xs text-primary capitalize mt-1 font-medium">{user.role}</p>
                   </div>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer">
+                    <UserCircle className="mr-2 h-4 w-4" /> My Profile
+                  </DropdownMenuItem>
                   {user.role === "owner" && (
                     <>
                       <DropdownMenuItem onClick={() => setLocation("/owner/dashboard")} className="cursor-pointer">
@@ -117,17 +120,14 @@ export function Navbar() {
                       <DropdownMenuItem onClick={() => setLocation("/owner/properties")} className="cursor-pointer">
                         <Home className="mr-2 h-4 w-4" /> My Properties
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
                     </>
                   )}
                   {user.role === "tenant" && (
-                    <>
-                      <DropdownMenuItem onClick={() => setLocation("/tenant/bookings")} className="cursor-pointer">
-                        <CalendarDays className="mr-2 h-4 w-4" /> My Bookings
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
+                    <DropdownMenuItem onClick={() => setLocation("/tenant/bookings")} className="cursor-pointer">
+                      <CalendarDays className="mr-2 h-4 w-4" /> My Bookings
+                    </DropdownMenuItem>
                   )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="cursor-pointer text-destructive focus:text-destructive"
                     onClick={handleLogout}
@@ -193,6 +193,13 @@ export function Navbar() {
                       <p className="text-xs text-primary capitalize font-medium mt-1">{user.role} account</p>
                     </div>
 
+                    <Link
+                      href="/profile"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium hover:bg-muted transition-colors"
+                    >
+                      <UserCircle className="h-4 w-4 text-muted-foreground" /> My Profile
+                    </Link>
                     {user.role === "owner" && (
                       <>
                         <Link

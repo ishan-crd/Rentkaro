@@ -96,6 +96,35 @@ router.post("/auth/logout", (req, res) => {
   });
 });
 
+router.put("/auth/profile", requireAuth, async (req, res) => {
+  const session = req.session as { userId?: number };
+  const { name, phone } = req.body as { name?: string; phone?: string };
+
+  const updates: Partial<{ name: string; phone: string | null }> = {};
+  if (typeof name === "string" && name.trim().length >= 2) updates.name = name.trim();
+  if (typeof phone === "string") updates.phone = phone.trim() || null;
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No valid fields to update" });
+    return;
+  }
+
+  const [user] = await db
+    .update(usersTable)
+    .set(updates)
+    .where(eq(usersTable.id, session.userId!))
+    .returning();
+
+  res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    createdAt: user.createdAt.toISOString(),
+  });
+});
+
 router.get("/auth/me", requireAuth, async (req, res) => {
   const session = req.session as { userId?: number };
   const [user] = await db

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, propertiesTable, usersTable, reviewsTable, bookingsTable } from "@workspace/db";
-import { eq, and, gte, lte, sql, desc, asc, count, avg } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, asc, count, avg, SQL } from "drizzle-orm";
 import { CreatePropertyBody, UpdatePropertyBody } from "@workspace/api-zod";
 import { requireAuth, requireOwner } from "../middlewares/auth";
 
@@ -14,20 +14,13 @@ function sentimentLabel(score: number | null) {
 }
 
 async function formatProperty(prop: typeof propertiesTable.$inferSelect) {
-  const owner = await db
-    .select({ name: usersTable.name, phone: usersTable.phone })
-    .from(usersTable)
-    .where(eq(usersTable.id, prop.ownerId))
-    .limit(1);
-
-  const reviewStats = await db
-    .select({
-      count: count(),
-      avgRating: avg(reviewsTable.rating),
-      avgSentiment: avg(reviewsTable.sentimentScore),
-    })
-    .from(reviewsTable)
-    .where(eq(reviewsTable.propertyId, prop.id));
+  const [ownerData, reviewStats, bookingCount] = await Promise.all([
+    db.select({ name: usersTable.name, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, prop.ownerId)).limit(1),
+    db.select({ count: count(), avgRating: avg(reviewsTable.rating), avgSentiment: avg(reviewsTable.sentimentScore) })
+      .from(reviewsTable).where(eq(reviewsTable.propertyId, prop.id)),
+    db.select({ count: count() }).from(bookingsTable).where(eq(bookingsTable.propertyId, prop.id)),
+  ]);
 
   const stats = reviewStats[0];
   const sentimentScore = stats.avgSentiment ? Number(stats.avgSentiment) : null;
@@ -45,12 +38,14 @@ async function formatProperty(prop: typeof propertiesTable.$inferSelect) {
     amenities: prop.amenities,
     images: prop.images,
     availability: prop.availability,
+    viewCount: prop.viewCount,
     rating: stats.avgRating ? Number(Number(stats.avgRating).toFixed(1)) : null,
     reviewCount: Number(stats.count),
+    bookingCount: Number(bookingCount[0].count),
     sentimentScore,
     ownerId: prop.ownerId,
-    ownerName: owner[0]?.name ?? "Unknown",
-    ownerPhone: owner[0]?.phone ?? null,
+    ownerName: ownerData[0]?.name ?? "Unknown",
+    ownerPhone: ownerData[0]?.phone ?? null,
     createdAt: prop.createdAt.toISOString(),
   };
 }
@@ -94,7 +89,7 @@ router.get("/properties", async (req, res) => {
     .where(whereClause);
   const total = Number(totalResult[0].count);
 
-  let orderBy;
+  let orderBy: SQL;
   switch (sortBy) {
     case "rent_asc":
       orderBy = asc(propertiesTable.rent);
@@ -102,9 +97,13 @@ router.get("/properties", async (req, res) => {
     case "rent_desc":
       orderBy = desc(propertiesTable.rent);
       break;
-    case "newest":
-      orderBy = desc(propertiesTable.createdAt);
+    case "rating":
+      orderBy = sql`(SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE property_id = ${propertiesTable.id}) DESC`;
       break;
+    case "views":
+      orderBy = desc(propertiesTable.viewCount);
+      break;
+    case "newest":
     default:
       orderBy = desc(propertiesTable.createdAt);
   }

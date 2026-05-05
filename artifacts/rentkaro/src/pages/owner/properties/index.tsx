@@ -146,8 +146,14 @@ export default function OwnerProperties() {
                     <div className="text-muted-foreground">Type</div>
                     <div className="font-medium text-right capitalize">{property.roomType}</div>
                     
-                    <div className="text-muted-foreground">Inquiries</div>
+                    <div className="text-muted-foreground">Reviews</div>
                     <div className="font-medium text-right">{property.reviewCount || 0}</div>
+                    
+                    <div className="text-muted-foreground">Inquiries</div>
+                    <div className="font-medium text-right">{(property as any).bookingCount ?? 0}</div>
+                    
+                    <div className="text-muted-foreground">Views</div>
+                    <div className="font-medium text-right">{(property as any).viewCount ?? 0}</div>
                   </div>
                   
                   <div className="flex items-center justify-between pt-4 border-t mt-auto">
