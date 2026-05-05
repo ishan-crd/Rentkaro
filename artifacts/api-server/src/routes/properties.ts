@@ -78,6 +78,10 @@ router.get("/properties", async (req, res) => {
   if (genderPreference && ["male", "female", "any"].includes(genderPreference)) {
     conditions.push(eq(propertiesTable.genderPreference, genderPreference as "male" | "female" | "any"));
   }
+  const { roomType } = req.query as Record<string, string>;
+  if (roomType && ["single", "double", "triple", "shared"].includes(roomType)) {
+    conditions.push(eq(propertiesTable.roomType, roomType as "single" | "double" | "triple" | "shared"));
+  }
   if (availability !== undefined) {
     conditions.push(eq(propertiesTable.availability, availability === "true"));
   }

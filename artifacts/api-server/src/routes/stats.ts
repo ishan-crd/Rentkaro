@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, propertiesTable, bookingsTable, usersTable, reviewsTable } from "@workspace/db";
-import { eq, count, avg } from "drizzle-orm";
+import { eq, count, avg, sql, desc } from "drizzle-orm";
 import { requireOwner } from "../middlewares/auth";
 
 const router = Router();
@@ -36,11 +36,7 @@ router.get("/stats/owner", requireOwner, async (req, res) => {
     const ratingResult = await db
       .select({ avg: avg(reviewsTable.rating) })
       .from(reviewsTable)
-      .where(
-        propIds.length === 1
-          ? eq(reviewsTable.propertyId, propIds[0])
-          : eq(reviewsTable.propertyId, propIds[0]),
-      );
+      .where(sql`${reviewsTable.propertyId} = ANY(ARRAY[${sql.join(propIds.map((id) => sql`${id}`), sql`, `)}]::int[])`);
 
     averageRating = ratingResult[0]?.avg
       ? Math.round(Number(ratingResult[0].avg) * 10) / 10
@@ -49,7 +45,8 @@ router.get("/stats/owner", requireOwner, async (req, res) => {
     const recent = await db
       .select()
       .from(bookingsTable)
-      .where(eq(bookingsTable.propertyId, propIds[0]))
+      .where(sql`${bookingsTable.propertyId} = ANY(ARRAY[${sql.join(propIds.map((id) => sql`${id}`), sql`, `)}]::int[])`)
+      .orderBy(desc(bookingsTable.createdAt))
       .limit(5);
 
     recentInquiries = await Promise.all(

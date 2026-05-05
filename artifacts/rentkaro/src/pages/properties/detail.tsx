@@ -3,7 +3,7 @@ import { useRoute } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useGetProperty, useCreateBooking, getGetPropertyQueryKey, getListBookingsQueryKey } from "@workspace/api-client-react";
+import { useGetProperty, useCreateBooking, useCreateReview, getGetPropertyQueryKey, getListBookingsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -30,13 +30,44 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Users, Bed, Check, ShieldCheck, Mail, Phone, Calendar, Info, Star } from "lucide-react";
+import { MapPin, Users, Bed, Check, ShieldCheck, Phone, Calendar, Star, PenLine } from "lucide-react";
 
 const bookingSchema = z.object({
   message: z.string().min(10, "Please provide a brief message to the owner (min 10 chars)"),
 });
-
 type BookingFormValues = z.infer<typeof bookingSchema>;
+
+const reviewSchema = z.object({
+  rating: z.number().min(1).max(5),
+  comment: z.string().min(10, "Please write at least 10 characters"),
+});
+type ReviewFormValues = z.infer<typeof reviewSchema>;
+
+function StarRatingInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHovered(star)}
+          onMouseLeave={() => setHovered(0)}
+          className="focus:outline-none"
+        >
+          <Star
+            className={`w-7 h-7 transition-colors ${
+              star <= (hovered || value)
+                ? "fill-yellow-400 text-yellow-400"
+                : "text-muted-foreground/30"
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function PropertyDetail() {
   const [, params] = useRoute("/properties/:id");
@@ -45,19 +76,23 @@ export default function PropertyDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   const { data: property, isLoading, isError } = useGetProperty(propertyId, {
     query: {
       enabled: !!propertyId,
-      queryKey: getGetPropertyQueryKey(propertyId)
-    }
+      queryKey: getGetPropertyQueryKey(propertyId),
+    },
   });
 
-  const form = useForm<BookingFormValues>({
+  const bookingForm = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
-    defaultValues: {
-      message: "",
-    },
+    defaultValues: { message: "" },
+  });
+
+  const reviewForm = useForm<ReviewFormValues>({
+    resolver: zodResolver(reviewSchema),
+    defaultValues: { rating: 0, comment: "" },
   });
 
   const createBookingMutation = useCreateBooking({
@@ -65,17 +100,35 @@ export default function PropertyDetail() {
       onSuccess: () => {
         toast({ title: "Inquiry sent successfully", description: "The owner will contact you soon." });
         setIsBookingOpen(false);
-        form.reset();
+        bookingForm.reset();
         queryClient.invalidateQueries({ queryKey: getListBookingsQueryKey() });
       },
       onError: (err: any) => {
         toast({ variant: "destructive", title: "Failed to send inquiry", description: err.error || "An error occurred." });
-      }
-    }
+      },
+    },
   });
 
-  const onSubmit = (data: BookingFormValues) => {
+  const createReviewMutation = useCreateReview({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Review submitted!", description: "Thank you for sharing your experience." });
+        setIsReviewOpen(false);
+        reviewForm.reset();
+        queryClient.invalidateQueries({ queryKey: getGetPropertyQueryKey(propertyId) });
+      },
+      onError: (err: any) => {
+        toast({ variant: "destructive", title: "Failed to submit review", description: err.error || "An error occurred." });
+      },
+    },
+  });
+
+  const onBookingSubmit = (data: BookingFormValues) => {
     createBookingMutation.mutate({ data: { propertyId, message: data.message } });
+  };
+
+  const onReviewSubmit = (data: ReviewFormValues) => {
+    createReviewMutation.mutate({ propertyId, data });
   };
 
   if (isLoading) {
@@ -110,6 +163,8 @@ export default function PropertyDetail() {
     );
   }
 
+  const alreadyReviewed = property.reviews?.some((r: any) => r.tenantId === user?.id);
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -130,11 +185,17 @@ export default function PropertyDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={property.genderPreference === 'female' ? "destructive" : property.genderPreference === 'male' ? "secondary" : "default"} className="px-3 py-1 text-sm capitalize">
-              {property.genderPreference === 'any' ? 'Unisex' : property.genderPreference} Only
+            <Badge
+              variant={property.genderPreference === "female" ? "destructive" : property.genderPreference === "male" ? "secondary" : "default"}
+              className="px-3 py-1 text-sm capitalize"
+            >
+              {property.genderPreference === "any" ? "Unisex" : property.genderPreference} Only
             </Badge>
-            <Badge variant={property.availability ? "default" : "secondary"} className="px-3 py-1 text-sm bg-green-500 hover:bg-green-600 text-white">
-              {property.availability ? 'Available Now' : 'Not Available'}
+            <Badge
+              variant={property.availability ? "default" : "secondary"}
+              className="px-3 py-1 text-sm bg-green-500 hover:bg-green-600 text-white"
+            >
+              {property.availability ? "Available Now" : "Not Available"}
             </Badge>
           </div>
         </div>
@@ -142,41 +203,36 @@ export default function PropertyDetail() {
         {/* Image Gallery */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mb-10 h-[400px] md:h-[500px]">
           <div className="md:col-span-2 h-full rounded-l-xl overflow-hidden relative group cursor-pointer">
-            <img 
-              src={property.images && property.images.length > 0 ? property.images[0] : `https://picsum.photos/seed/${property.id}/1200/800`} 
-              alt="Main property image" 
+            <img
+              src={property.images && property.images.length > 0 ? property.images[0] : `https://picsum.photos/seed/${property.id}/1200/800`}
+              alt="Main property image"
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           </div>
           <div className="hidden md:flex flex-col gap-4 h-full">
             <div className="h-[calc(50%-0.5rem)] rounded-tr-xl overflow-hidden relative group cursor-pointer">
-              <img 
-                src={property.images && property.images.length > 1 ? property.images[1] : `https://picsum.photos/seed/${property.id+1}/600/400`} 
-                alt="Property interior" 
+              <img
+                src={property.images && property.images.length > 1 ? property.images[1] : `https://picsum.photos/seed/${property.id + 1}/600/400`}
+                alt="Property interior"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             </div>
             <div className="h-[calc(50%-0.5rem)] rounded-br-xl overflow-hidden relative group cursor-pointer">
-              <img 
-                src={property.images && property.images.length > 2 ? property.images[2] : `https://picsum.photos/seed/${property.id+2}/600/400`} 
-                alt="Property exterior" 
+              <img
+                src={property.images && property.images.length > 2 ? property.images[2] : `https://picsum.photos/seed/${property.id + 2}/600/400`}
+                alt="Property exterior"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-white font-medium">View Gallery</span>
-              </div>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           <div className="lg:col-span-2 space-y-10">
-            {/* Overview */}
+            {/* About */}
             <section>
               <h2 className="text-2xl font-bold mb-4">About this PG</h2>
-              <div className="prose max-w-none text-muted-foreground whitespace-pre-line">
-                {property.description}
-              </div>
+              <div className="prose max-w-none text-muted-foreground whitespace-pre-line">{property.description}</div>
             </section>
 
             <Separator />
@@ -185,34 +241,18 @@ export default function PropertyDetail() {
             <section>
               <h2 className="text-2xl font-bold mb-6">Room Details</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 rounded-xl border bg-card flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <Bed className="w-5 h-5" />
+                {[
+                  { icon: <Bed className="w-5 h-5" />, label: "Room Type", value: property.roomType },
+                  { icon: <Users className="w-5 h-5" />, label: "For", value: property.genderPreference === "any" ? "Anyone" : property.genderPreference },
+                  { icon: <Calendar className="w-5 h-5" />, label: "Available", value: property.availability ? "Immediately" : "Currently Full" },
+                  { icon: <ShieldCheck className="w-5 h-5" />, label: "Verified", value: "Yes", valueClass: "text-green-600" },
+                ].map(({ icon, label, value, valueClass }) => (
+                  <div key={label} className="p-4 rounded-xl border bg-card flex flex-col items-center text-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">{icon}</div>
+                    <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">{label}</span>
+                    <span className={`font-semibold capitalize ${valueClass || ""}`}>{value}</span>
                   </div>
-                  <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Room Type</span>
-                  <span className="font-semibold capitalize">{property.roomType}</span>
-                </div>
-                <div className="p-4 rounded-xl border bg-card flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">For</span>
-                  <span className="font-semibold capitalize">{property.genderPreference === 'any' ? 'Anyone' : property.genderPreference}</span>
-                </div>
-                <div className="p-4 rounded-xl border bg-card flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Available</span>
-                  <span className="font-semibold">{property.availability ? 'Immediately' : 'Currently Full'}</span>
-                </div>
-                <div className="p-4 rounded-xl border bg-card flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <ShieldCheck className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Verified</span>
-                  <span className="font-semibold text-green-600">Yes</span>
-                </div>
+                ))}
               </div>
             </section>
 
@@ -223,7 +263,7 @@ export default function PropertyDetail() {
               <h2 className="text-2xl font-bold mb-6">Amenities included</h2>
               {property.amenities && property.amenities.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {property.amenities.map(amenity => (
+                  {property.amenities.map((amenity: string) => (
                     <div key={amenity} className="flex items-center gap-3">
                       <Check className="w-5 h-5 text-green-500 shrink-0" />
                       <span className="text-muted-foreground">{amenity}</span>
@@ -240,17 +280,83 @@ export default function PropertyDetail() {
             {/* Reviews */}
             <section>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Reviews</h2>
-                {property.sentimentScore !== undefined && property.sentimentScore !== null && (
-                  <div className="w-48 hidden md:block">
-                    <SentimentBar score={property.sentimentScore} />
-                  </div>
-                )}
+                <div>
+                  <h2 className="text-2xl font-bold">Reviews</h2>
+                  {property.reviewCount > 0 && (
+                    <p className="text-muted-foreground text-sm mt-1">{property.reviewCount} review{property.reviewCount !== 1 ? "s" : ""}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {property.sentimentScore !== undefined && property.sentimentScore !== null && (
+                    <div className="w-48 hidden md:block">
+                      <SentimentBar score={property.sentimentScore} />
+                    </div>
+                  )}
+                  {user?.role === "tenant" && !alreadyReviewed && (
+                    <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <PenLine className="w-4 h-4" /> Write a Review
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Write a Review</DialogTitle>
+                          <DialogDescription>Share your experience with {property.title}</DialogDescription>
+                        </DialogHeader>
+                        <Form {...reviewForm}>
+                          <form onSubmit={reviewForm.handleSubmit(onReviewSubmit)} className="space-y-5 pt-2">
+                            <FormField
+                              control={reviewForm.control}
+                              name="rating"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Your Rating</FormLabel>
+                                  <FormControl>
+                                    <StarRatingInput value={field.value} onChange={field.onChange} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={reviewForm.control}
+                              name="comment"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Your Review</FormLabel>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder="Describe your stay — food, cleanliness, staff, location..."
+                                      className="min-h-[120px]"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex justify-end pt-2">
+                              <Button type="submit" disabled={createReviewMutation.isPending}>
+                                {createReviewMutation.isPending ? "Submitting..." : "Submit Review"}
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  {user?.role === "tenant" && alreadyReviewed && (
+                    <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                      <Check className="w-3 h-3 mr-1" /> Reviewed
+                    </Badge>
+                  )}
+                </div>
               </div>
-              
+
               {property.reviews && property.reviews.length > 0 ? (
                 <div className="space-y-6">
-                  {property.reviews.map(review => (
+                  {property.reviews.map((review: any) => (
                     <div key={review.id} className="p-5 rounded-xl border bg-card/50 space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
@@ -260,7 +366,7 @@ export default function PropertyDetail() {
                         <div className="flex items-center gap-2">
                           <div className="flex text-yellow-400">
                             {Array.from({ length: 5 }).map((_, i) => (
-                              <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-current' : 'text-muted stroke-muted-foreground/30'}`} />
+                              <Star key={i} className={`w-4 h-4 ${i < review.rating ? "fill-current" : "text-muted stroke-muted-foreground/30"}`} />
                             ))}
                           </div>
                           {review.sentimentLabel && review.sentimentScore !== null && review.sentimentScore !== undefined && (
@@ -274,7 +380,10 @@ export default function PropertyDetail() {
                 </div>
               ) : (
                 <div className="text-center p-8 bg-muted/20 rounded-xl border border-dashed">
-                  <p className="text-muted-foreground">No reviews yet for this property.</p>
+                  <p className="text-muted-foreground">No reviews yet.</p>
+                  {user?.role === "tenant" && (
+                    <p className="text-sm text-primary mt-2 font-medium">Be the first to review this property!</p>
+                  )}
                 </div>
               )}
             </section>
@@ -285,19 +394,18 @@ export default function PropertyDetail() {
             <div className="sticky top-24 border rounded-xl shadow-lg bg-card overflow-hidden">
               <div className="p-6 border-b bg-muted/10">
                 <div className="flex items-end gap-2 mb-2">
-                  <span className="text-3xl font-bold text-primary">₹{property.rent.toLocaleString('en-IN')}</span>
+                  <span className="text-3xl font-bold text-primary">₹{property.rent.toLocaleString("en-IN")}</span>
                   <span className="text-muted-foreground font-medium mb-1">/ month</span>
                 </div>
                 <div className="text-sm text-muted-foreground flex justify-between">
                   <span>Security Deposit</span>
-                  <span className="font-semibold text-foreground">₹{property.deposit.toLocaleString('en-IN')}</span>
+                  <span className="font-semibold text-foreground">₹{property.deposit.toLocaleString("en-IN")}</span>
                 </div>
               </div>
-              
+
               <div className="p-6 space-y-6">
                 {property.sentimentScore !== undefined && property.sentimentScore !== null && (
                   <div className="p-4 bg-muted/30 rounded-lg border">
-                    <div className="text-sm font-medium mb-2">Overall Community Sentiment</div>
                     <SentimentBar score={property.sentimentScore} />
                   </div>
                 )}
@@ -315,23 +423,19 @@ export default function PropertyDetail() {
                       </div>
                     </div>
                   </div>
-                  {user && (
-                    <div className="pt-2 space-y-2 text-sm">
-                      {property.ownerPhone && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="w-4 h-4" /> {property.ownerPhone}
-                        </div>
-                      )}
+                  {user && property.ownerPhone && (
+                    <div className="text-sm flex items-center gap-2 text-muted-foreground">
+                      <Phone className="w-4 h-4" /> {property.ownerPhone}
                     </div>
                   )}
                 </div>
 
                 {user ? (
-                  user.role === 'tenant' ? (
+                  user.role === "tenant" ? (
                     <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
                       <DialogTrigger asChild>
                         <Button className="w-full h-12 text-base font-semibold" disabled={!property.availability}>
-                          {property.availability ? 'Contact Owner' : 'Currently Unavailable'}
+                          {property.availability ? "Contact Owner" : "Currently Unavailable"}
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
@@ -341,19 +445,19 @@ export default function PropertyDetail() {
                             Send an inquiry for {property.title}. The owner will receive your contact details.
                           </DialogDescription>
                         </DialogHeader>
-                        <Form {...form}>
-                          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+                        <Form {...bookingForm}>
+                          <form onSubmit={bookingForm.handleSubmit(onBookingSubmit)} className="space-y-4 pt-4">
                             <FormField
-                              control={form.control}
+                              control={bookingForm.control}
                               name="message"
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>Message</FormLabel>
                                   <FormControl>
-                                    <Textarea 
-                                      placeholder="Hi, I'm interested in this PG. I am a student looking to move in next month..." 
+                                    <Textarea
+                                      placeholder="Hi, I'm interested in this PG. I am a student looking to move in next month..."
                                       className="min-h-[120px]"
-                                      {...field} 
+                                      {...field}
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -362,7 +466,7 @@ export default function PropertyDetail() {
                             />
                             <div className="flex justify-end pt-4">
                               <Button type="submit" disabled={createBookingMutation.isPending}>
-                                {createBookingMutation.isPending ? 'Sending...' : 'Send Inquiry'}
+                                {createBookingMutation.isPending ? "Sending..." : "Send Inquiry"}
                               </Button>
                             </div>
                           </form>
