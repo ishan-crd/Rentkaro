@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: RentKaro PG Accommodation API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: properties
+    description: PG property operations
+  - name: bookings
+    description: Booking/inquiry operations
+  - name: reviews
+    description: Review operations
+  - name: users
+    description: User profile operations
+  - name: stats
+    description: Dashboard statistics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +36,408 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout user
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /properties:
+    get:
+      operationId: listProperties
+      tags: [properties]
+      summary: List and search properties
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: minRent
+          in: query
+          schema:
+            type: number
+        - name: maxRent
+          in: query
+          schema:
+            type: number
+        - name: genderPreference
+          in: query
+          schema:
+            type: string
+            enum: [male, female, any]
+        - name: amenities
+          in: query
+          schema:
+            type: string
+        - name: availability
+          in: query
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [rent_asc, rent_desc, rating, newest]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Properties list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertiesListResponse"
+
+    post:
+      operationId: createProperty
+      tags: [properties]
+      summary: Create a new property listing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePropertyBody"
+      responses:
+        "201":
+          description: Property created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Property"
+
+  /properties/recommended:
+    get:
+      operationId: getRecommendedProperties
+      tags: [properties]
+      summary: Get ML-recommended properties for the current user
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 6
+      responses:
+        "200":
+          description: Recommended properties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Property"
+
+  /properties/cities:
+    get:
+      operationId: getPropertyCities
+      tags: [properties]
+      summary: Get list of cities with property counts
+      responses:
+        "200":
+          description: Cities list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CityCount"
+
+  /properties/{id}:
+    get:
+      operationId: getProperty
+      tags: [properties]
+      summary: Get property by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Property detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateProperty
+      tags: [properties]
+      summary: Update a property
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePropertyBody"
+      responses:
+        "200":
+          description: Property updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Property"
+
+    delete:
+      operationId: deleteProperty
+      tags: [properties]
+      summary: Delete a property
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /properties/owner/my:
+    get:
+      operationId: getMyProperties
+      tags: [properties]
+      summary: Get properties owned by current user
+      responses:
+        "200":
+          description: Owner properties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Property"
+
+  /bookings:
+    get:
+      operationId: listBookings
+      tags: [bookings]
+      summary: List bookings (tenant sees own, owner sees for their properties)
+      responses:
+        "200":
+          description: Bookings list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Create a booking inquiry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingBody"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{id}/status:
+    put:
+      operationId: updateBookingStatus
+      tags: [bookings]
+      summary: Update booking status (owner action)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingStatusBody"
+      responses:
+        "200":
+          description: Booking updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /reviews/{propertyId}:
+    get:
+      operationId: getPropertyReviews
+      tags: [reviews]
+      summary: Get reviews for a property
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reviews list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+
+    post:
+      operationId: createReview
+      tags: [reviews]
+      summary: Create a review for a property
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewBody"
+      responses:
+        "201":
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /stats/owner:
+    get:
+      operationId: getOwnerStats
+      tags: [stats]
+      summary: Get owner dashboard statistics
+      responses:
+        "200":
+          description: Owner stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerStats"
+
+  /stats/overview:
+    get:
+      operationId: getPlatformStats
+      tags: [stats]
+      summary: Get platform-wide overview stats (public)
+      responses:
+        "200":
+          description: Platform stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformStats"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +445,341 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    RegisterBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [tenant, owner]
+      required: [name, email, password, role]
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        message:
+          type: string
+      required: [user, message]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [tenant, owner]
+        createdAt:
+          type: string
+      required: [id, name, email, role, createdAt]
+
+    Property:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        rent:
+          type: number
+        deposit:
+          type: number
+        genderPreference:
+          type: string
+          enum: [male, female, any]
+        roomType:
+          type: string
+          enum: [single, double, triple, shared]
+        amenities:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        availability:
+          type: boolean
+        rating:
+          type: number
+          nullable: true
+        reviewCount:
+          type: integer
+        sentimentScore:
+          type: number
+          nullable: true
+        ownerId:
+          type: integer
+        ownerName:
+          type: string
+        ownerPhone:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, title, description, city, address, rent, deposit, genderPreference, roomType, amenities, images, availability, reviewCount, ownerId, ownerName, createdAt]
+
+    PropertyDetail:
+      allOf:
+        - $ref: "#/components/schemas/Property"
+        - type: object
+          properties:
+            reviews:
+              type: array
+              items:
+                $ref: "#/components/schemas/Review"
+          required: [reviews]
+
+    PropertiesListResponse:
+      type: object
+      properties:
+        properties:
+          type: array
+          items:
+            $ref: "#/components/schemas/Property"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+      required: [properties, total, page, totalPages]
+
+    CreatePropertyBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        rent:
+          type: number
+        deposit:
+          type: number
+        genderPreference:
+          type: string
+          enum: [male, female, any]
+        roomType:
+          type: string
+          enum: [single, double, triple, shared]
+        amenities:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        availability:
+          type: boolean
+      required: [title, description, city, address, rent, deposit, genderPreference, roomType]
+
+    UpdatePropertyBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        rent:
+          type: number
+        deposit:
+          type: number
+        genderPreference:
+          type: string
+          enum: [male, female, any]
+        roomType:
+          type: string
+          enum: [single, double, triple, shared]
+        amenities:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        availability:
+          type: boolean
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: integer
+        propertyId:
+          type: integer
+        propertyTitle:
+          type: string
+        propertyCity:
+          type: string
+        tenantId:
+          type: integer
+        tenantName:
+          type: string
+        tenantPhone:
+          type: string
+          nullable: true
+        tenantEmail:
+          type: string
+        message:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, approved, rejected, cancelled]
+        createdAt:
+          type: string
+      required: [id, propertyId, propertyTitle, propertyCity, tenantId, tenantName, tenantEmail, status, createdAt]
+
+    CreateBookingBody:
+      type: object
+      properties:
+        propertyId:
+          type: integer
+        message:
+          type: string
+      required: [propertyId]
+
+    UpdateBookingStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected, cancelled]
+      required: [status]
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: integer
+        propertyId:
+          type: integer
+        tenantId:
+          type: integer
+        tenantName:
+          type: string
+        rating:
+          type: integer
+        comment:
+          type: string
+        sentimentScore:
+          type: number
+          nullable: true
+        sentimentLabel:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, propertyId, tenantId, tenantName, rating, comment, createdAt]
+
+    CreateReviewBody:
+      type: object
+      properties:
+        rating:
+          type: integer
+        comment:
+          type: string
+      required: [rating, comment]
+
+    CityCount:
+      type: object
+      properties:
+        city:
+          type: string
+        count:
+          type: integer
+      required: [city, count]
+
+    OwnerStats:
+      type: object
+      properties:
+        totalProperties:
+          type: integer
+        totalInquiries:
+          type: integer
+        pendingInquiries:
+          type: integer
+        approvedBookings:
+          type: integer
+        totalViews:
+          type: integer
+        averageRating:
+          type: number
+          nullable: true
+        recentInquiries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Booking"
+      required: [totalProperties, totalInquiries, pendingInquiries, approvedBookings, totalViews]
+
+    PlatformStats:
+      type: object
+      properties:
+        totalProperties:
+          type: integer
+        totalCities:
+          type: integer
+        totalTenants:
+          type: integer
+        totalOwners:
+          type: integer
+        totalBookings:
+          type: integer
+      required: [totalProperties, totalCities, totalTenants, totalOwners, totalBookings]
