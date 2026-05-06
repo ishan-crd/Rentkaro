@@ -105,7 +105,7 @@ export default function Home() {
       </section>
 
       {/* Recommended Section */}
-      {recommendedProperties && recommendedProperties.length > 0 && (
+      {Array.isArray(recommendedProperties) && recommendedProperties.length > 0 && (
         <section className="py-20">
           <div className="container px-4 mx-auto">
             <div className="flex justify-between items-end mb-10">
