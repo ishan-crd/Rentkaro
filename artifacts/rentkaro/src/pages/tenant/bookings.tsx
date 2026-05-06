@@ -1,7 +1,9 @@
-import { useListBookings, useUpdateBookingStatus, getListBookingsQueryKey } from "@workspace/api-client-react";
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import { useAuth } from "@/lib/auth";
 import { Link } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout/Layout";
 import { Badge } from "@/components/ui/badge";
@@ -17,30 +19,26 @@ import {
 } from "@/components/ui/select";
 
 export default function TenantBookings() {
-  const { user } = useAuth();
+  const { user, userId } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const isOwner = user?.role === 'owner';
+  const [isPending, setIsPending] = useState(false);
 
-  const { data: bookings, isLoading } = useListBookings({
-    query: { queryKey: getListBookingsQueryKey() }
-  });
+  const bookings = useQuery(api.bookings.list, userId ? { userId, role: user.role } : "skip");
+  const isLoading = bookings === undefined;
 
-  const updateStatusMutation = useUpdateBookingStatus();
+  const updateStatus = useMutation(api.bookings.updateStatus);
 
-  const handleStatusUpdate = (id: number, status: 'approved' | 'rejected' | 'cancelled') => {
-    updateStatusMutation.mutate(
-      { id, data: { status } },
-      {
-        onSuccess: () => {
-          toast({ title: "Status updated successfully" });
-          queryClient.invalidateQueries({ queryKey: getListBookingsQueryKey() });
-        },
-        onError: (err: any) => {
-          toast({ variant: "destructive", title: "Update failed", description: err.error });
-        }
-      }
-    );
+  const handleStatusUpdate = async (id: Id<"bookings">, status: 'approved' | 'rejected' | 'cancelled') => {
+    setIsPending(true);
+    try {
+      await updateStatus({ id, status });
+      toast({ title: "Status updated successfully" });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Update failed", description: err.message || err.error });
+    } finally {
+      setIsPending(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -75,7 +73,7 @@ export default function TenantBookings() {
         ) : bookings && bookings.length > 0 ? (
           <div className="space-y-4">
             {bookings.map(booking => (
-              <Card key={booking.id} className="overflow-hidden">
+              <Card key={booking._id} className="overflow-hidden">
                 <CardContent className="p-0">
                   <div className="flex flex-col sm:flex-row">
                     <div className="bg-muted/30 p-6 sm:w-1/3 border-b sm:border-b-0 sm:border-r flex flex-col justify-center">
@@ -95,7 +93,7 @@ export default function TenantBookings() {
                         <MapPin className="w-3 h-3 shrink-0" /> {booking.propertyCity}
                       </div>
                     </div>
-                    
+
                     <div className="p-6 sm:w-2/3 flex flex-col">
                       <div className="mb-4 flex-1">
                         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -118,37 +116,37 @@ export default function TenantBookings() {
                       <div className="flex items-center justify-end pt-4 border-t gap-3 mt-auto">
                         {isOwner && booking.status === 'pending' ? (
                           <div className="flex gap-2 w-full sm:w-auto">
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               className="text-destructive hover:bg-destructive/10 flex-1 sm:flex-none"
-                              onClick={() => handleStatusUpdate(booking.id, 'rejected')}
-                              disabled={updateStatusMutation.isPending}
+                              onClick={() => handleStatusUpdate(booking._id, 'rejected')}
+                              disabled={isPending}
                             >
                               Reject
                             </Button>
-                            <Button 
+                            <Button
                               className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none"
-                              onClick={() => handleStatusUpdate(booking.id, 'approved')}
-                              disabled={updateStatusMutation.isPending}
+                              onClick={() => handleStatusUpdate(booking._id, 'approved')}
+                              disabled={isPending}
                             >
                               Approve
                             </Button>
                           </div>
                         ) : !isOwner && booking.status === 'pending' ? (
-                          <Button 
-                            variant="outline" 
-                            onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
-                            disabled={updateStatusMutation.isPending}
+                          <Button
+                            variant="outline"
+                            onClick={() => handleStatusUpdate(booking._id, 'cancelled')}
+                            disabled={isPending}
                           >
                             Cancel Inquiry
                           </Button>
                         ) : isOwner ? (
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-muted-foreground">Change Status:</span>
-                            <Select 
+                            <Select
                               defaultValue={booking.status}
-                              onValueChange={(val: any) => handleStatusUpdate(booking.id, val)}
-                              disabled={updateStatusMutation.isPending}
+                              onValueChange={(val: any) => handleStatusUpdate(booking._id, val)}
+                              disabled={isPending}
                             >
                               <SelectTrigger className="w-[130px] h-8">
                                 <SelectValue />
@@ -177,7 +175,7 @@ export default function TenantBookings() {
             </div>
             <h3 className="text-xl font-bold mb-2">No inquiries yet</h3>
             <p className="text-muted-foreground max-w-md mx-auto mb-6">
-              {isOwner 
+              {isOwner
                 ? "You haven't received any booking inquiries for your properties yet."
                 : "You haven't sent any inquiries yet. Browse properties to find your next home."}
             </p>

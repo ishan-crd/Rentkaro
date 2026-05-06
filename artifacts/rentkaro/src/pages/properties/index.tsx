@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useListProperties, getListPropertiesQueryKey, ListPropertiesSortBy, ListPropertiesGenderPreference } from "@workspace/api-client-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Layout } from "@/components/layout/Layout";
 import { PropertyCard } from "@/components/PropertyCard";
 import { Button } from "@/components/ui/button";
@@ -116,18 +117,15 @@ export default function Properties() {
     city: appliedFilters.city || undefined,
     minRent: appliedFilters.minRent ? Number(appliedFilters.minRent) : undefined,
     maxRent: appliedFilters.maxRent ? Number(appliedFilters.maxRent) : undefined,
-    genderPreference: appliedFilters.genderPreference !== "any" ? (appliedFilters.genderPreference as ListPropertiesGenderPreference) : undefined,
-    roomType: appliedFilters.roomType !== "any" ? (appliedFilters.roomType as any) : undefined,
-    sortBy: appliedFilters.sortBy as ListPropertiesSortBy,
+    genderPreference: appliedFilters.genderPreference !== "any" ? appliedFilters.genderPreference : undefined,
+    roomType: appliedFilters.roomType !== "any" ? appliedFilters.roomType : undefined,
+    sortBy: appliedFilters.sortBy,
     page,
     limit: 12,
   };
 
-  const { data, isLoading, isError } = useListProperties(queryParams, {
-    query: {
-      queryKey: getListPropertiesQueryKey(queryParams),
-    },
-  });
+  const data = useQuery(api.properties.list, queryParams);
+  const isLoading = data === undefined;
 
   const handleApply = () => {
     setPage(1);
@@ -241,11 +239,6 @@ export default function Properties() {
               <Loader2 className="w-8 h-8 animate-spin mb-4 text-primary" />
               <p>Loading properties...</p>
             </div>
-          ) : isError ? (
-            <div className="flex flex-col items-center justify-center py-20 text-destructive text-center">
-              <p className="text-lg font-semibold">Failed to load properties.</p>
-              <p className="text-sm">Please try again later.</p>
-            </div>
           ) : data?.properties.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center bg-muted/20 rounded-xl border border-dashed">
               <Search className="w-12 h-12 text-muted-foreground mb-4" />
@@ -259,7 +252,7 @@ export default function Properties() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {data?.properties.map((property) => (
-                  <PropertyCard key={property.id} property={property} />
+                  <PropertyCard key={property._id} property={property} />
                 ))}
               </div>
 

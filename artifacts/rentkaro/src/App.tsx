@@ -1,5 +1,4 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, ProtectedRoute } from "@/lib/auth";
@@ -19,15 +18,6 @@ import PropertyForm from "@/pages/owner/properties/form";
 import TenantBookings from "@/pages/tenant/bookings";
 import ProfilePage from "@/pages/profile";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 mins
-    },
-  },
-});
-
 function Router() {
   return (
     <Switch>
@@ -38,7 +28,6 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
 
-      {/* Owner Routes */}
       <Route path="/owner/dashboard">
         <ProtectedRoute role="owner">
           <OwnerDashboard />
@@ -60,14 +49,12 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* Tenant/Shared Routes */}
       <Route path="/tenant/bookings">
         <ProtectedRoute>
           <TenantBookings />
         </ProtectedRoute>
       </Route>
 
-      {/* Profile */}
       <Route path="/profile">
         <ProtectedRoute>
           <ProfilePage />
@@ -81,16 +68,14 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthProvider>
-            <Router />
-          </AuthProvider>
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <TooltipProvider>
+      <WouterRouter>
+        <AuthProvider>
+          <Router />
+        </AuthProvider>
+      </WouterRouter>
+      <Toaster />
+    </TooltipProvider>
   );
 }
 

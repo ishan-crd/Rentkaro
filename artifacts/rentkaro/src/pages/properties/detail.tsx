@@ -3,8 +3,9 @@ import { useRoute } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useGetProperty, useCreateBooking, useCreateReview, getGetPropertyQueryKey, getListBookingsQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Layout } from "@/components/layout/Layout";
@@ -71,19 +72,19 @@ function StarRatingInput({ value, onChange }: { value: number; onChange: (v: num
 
 export default function PropertyDetail() {
   const [, params] = useRoute("/properties/:id");
-  const propertyId = Number(params?.id);
+  const propertyId = params?.id as Id<"properties">;
   const { user } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  const { data: property, isLoading, isError } = useGetProperty(propertyId, {
-    query: {
-      enabled: !!propertyId,
-      queryKey: getGetPropertyQueryKey(propertyId),
-    },
-  });
+  const property = useQuery(api.properties.get, propertyId ? { id: propertyId } : "skip");
+  const isLoading = property === undefined;
+
+  const createBooking = useMutation(api.bookings.create);
+  const createReview = useMutation(api.reviews.create);
 
   const bookingForm = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -95,40 +96,34 @@ export default function PropertyDetail() {
     defaultValues: { rating: 0, comment: "" },
   });
 
-  const createBookingMutation = useCreateBooking({
-    mutation: {
-      onSuccess: () => {
-        toast({ title: "Inquiry sent successfully", description: "The owner will contact you soon." });
-        setIsBookingOpen(false);
-        bookingForm.reset();
-        queryClient.invalidateQueries({ queryKey: getListBookingsQueryKey() });
-      },
-      onError: (err: any) => {
-        toast({ variant: "destructive", title: "Failed to send inquiry", description: err.error || "An error occurred." });
-      },
-    },
-  });
-
-  const createReviewMutation = useCreateReview({
-    mutation: {
-      onSuccess: () => {
-        toast({ title: "Review submitted!", description: "Thank you for sharing your experience." });
-        setIsReviewOpen(false);
-        reviewForm.reset();
-        queryClient.invalidateQueries({ queryKey: getGetPropertyQueryKey(propertyId) });
-      },
-      onError: (err: any) => {
-        toast({ variant: "destructive", title: "Failed to submit review", description: err.error || "An error occurred." });
-      },
-    },
-  });
-
-  const onBookingSubmit = (data: BookingFormValues) => {
-    createBookingMutation.mutate({ data: { propertyId, message: data.message } });
+  const onBookingSubmit = async (data: BookingFormValues) => {
+    if (!user) return;
+    setIsSubmittingBooking(true);
+    try {
+      await createBooking({ propertyId, tenantId: user._id, message: data.message });
+      toast({ title: "Inquiry sent successfully", description: "The owner will contact you soon." });
+      setIsBookingOpen(false);
+      bookingForm.reset();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Failed to send inquiry", description: err.message || "An error occurred." });
+    } finally {
+      setIsSubmittingBooking(false);
+    }
   };
 
-  const onReviewSubmit = (data: ReviewFormValues) => {
-    createReviewMutation.mutate({ propertyId, data });
+  const onReviewSubmit = async (data: ReviewFormValues) => {
+    if (!user) return;
+    setIsSubmittingReview(true);
+    try {
+      await createReview({ propertyId, tenantId: user._id, rating: data.rating, comment: data.comment });
+      toast({ title: "Review submitted!", description: "Thank you for sharing your experience." });
+      setIsReviewOpen(false);
+      reviewForm.reset();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Failed to submit review", description: err.message || "An error occurred." });
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   if (isLoading) {
@@ -152,7 +147,7 @@ export default function PropertyDetail() {
     );
   }
 
-  if (isError || !property) {
+  if (!property) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-20 text-center">
@@ -163,7 +158,7 @@ export default function PropertyDetail() {
     );
   }
 
-  const alreadyReviewed = property.reviews?.some((r: any) => r.tenantId === user?.id);
+  const alreadyReviewed = property.reviews?.some((r: any) => r.tenantId === user?._id);
 
   return (
     <Layout>
@@ -204,7 +199,7 @@ export default function PropertyDetail() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mb-10 h-[400px] md:h-[500px]">
           <div className="md:col-span-2 h-full rounded-l-xl overflow-hidden relative group cursor-pointer">
             <img
-              src={property.images && property.images.length > 0 ? property.images[0] : `https://picsum.photos/seed/${property.id}/1200/800`}
+              src={property.images && property.images.length > 0 ? property.images[0] : `https://picsum.photos/seed/${property._id}/1200/800`}
               alt="Main property image"
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
@@ -212,14 +207,14 @@ export default function PropertyDetail() {
           <div className="hidden md:flex flex-col gap-4 h-full">
             <div className="h-[calc(50%-0.5rem)] rounded-tr-xl overflow-hidden relative group cursor-pointer">
               <img
-                src={property.images && property.images.length > 1 ? property.images[1] : `https://picsum.photos/seed/${property.id + 1}/600/400`}
+                src={property.images && property.images.length > 1 ? property.images[1] : `https://picsum.photos/seed/${property._id}1/600/400`}
                 alt="Property interior"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             </div>
             <div className="h-[calc(50%-0.5rem)] rounded-br-xl overflow-hidden relative group cursor-pointer">
               <img
-                src={property.images && property.images.length > 2 ? property.images[2] : `https://picsum.photos/seed/${property.id + 2}/600/400`}
+                src={property.images && property.images.length > 2 ? property.images[2] : `https://picsum.photos/seed/${property._id}2/600/400`}
                 alt="Property exterior"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
@@ -337,8 +332,8 @@ export default function PropertyDetail() {
                               )}
                             />
                             <div className="flex justify-end pt-2">
-                              <Button type="submit" disabled={createReviewMutation.isPending}>
-                                {createReviewMutation.isPending ? "Submitting..." : "Submit Review"}
+                              <Button type="submit" disabled={isSubmittingReview}>
+                                {isSubmittingReview ? "Submitting..." : "Submit Review"}
                               </Button>
                             </div>
                           </form>
@@ -357,7 +352,7 @@ export default function PropertyDetail() {
               {property.reviews && property.reviews.length > 0 ? (
                 <div className="space-y-6">
                   {property.reviews.map((review: any) => (
-                    <div key={review.id} className="p-5 rounded-xl border bg-card/50 space-y-3">
+                    <div key={review._id} className="p-5 rounded-xl border bg-card/50 space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="font-semibold">{review.tenantName}</div>
@@ -465,8 +460,8 @@ export default function PropertyDetail() {
                               )}
                             />
                             <div className="flex justify-end pt-4">
-                              <Button type="submit" disabled={createBookingMutation.isPending}>
-                                {createBookingMutation.isPending ? "Sending..." : "Send Inquiry"}
+                              <Button type="submit" disabled={isSubmittingBooking}>
+                                {isSubmittingBooking ? "Sending..." : "Send Inquiry"}
                               </Button>
                             </div>
                           </form>

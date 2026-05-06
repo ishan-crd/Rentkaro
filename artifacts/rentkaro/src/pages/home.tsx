@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useGetPlatformStats, useGetPropertyCities, useGetRecommendedProperties, getGetPlatformStatsQueryKey, getGetPropertyCitiesQueryKey, getGetRecommendedPropertiesQueryKey } from "@workspace/api-client-react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,17 +13,9 @@ export default function Home() {
   const [city, setCity] = useState("");
   const [maxRent, setMaxRent] = useState("");
 
-  const { data: stats } = useGetPlatformStats({
-    query: { queryKey: getGetPlatformStatsQueryKey() }
-  });
-
-  const { data: cities } = useGetPropertyCities({
-    query: { queryKey: getGetPropertyCitiesQueryKey() }
-  });
-
-  const { data: recommendedProperties } = useGetRecommendedProperties({ limit: 4 }, {
-    query: { queryKey: getGetRecommendedPropertiesQueryKey({ limit: 4 }) }
-  });
+  const stats = useQuery(api.stats.platformStats);
+  const cities = useQuery(api.properties.cities);
+  const recommendedProperties = useQuery(api.properties.recommended, { limit: 4 });
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,14 +38,14 @@ export default function Home() {
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Discover trusted PG accommodations for students and young professionals across India. Clean, verified, and hassle-free.
             </p>
-            
+
             <div className="bg-card p-4 rounded-xl shadow-lg border max-w-3xl mx-auto mt-8">
               <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
                   <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input 
-                    type="text" 
-                    placeholder="Enter city (e.g. Bangalore)" 
+                  <Input
+                    type="text"
+                    placeholder="Enter city (e.g. Bangalore)"
                     className="pl-10 h-12 text-base"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
@@ -61,9 +54,9 @@ export default function Home() {
                 </div>
                 <div className="flex-1 relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
-                  <Input 
-                    type="number" 
-                    placeholder="Max budget per month" 
+                  <Input
+                    type="number"
+                    placeholder="Max budget per month"
                     className="pl-8 h-12 text-base"
                     value={maxRent}
                     onChange={(e) => setMaxRent(e.target.value)}
@@ -119,7 +112,7 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {recommendedProperties.map((property) => (
-                <PropertyCard key={property.id} property={property} />
+                <PropertyCard key={property._id} property={property} />
               ))}
             </div>
             <div className="mt-8 text-center md:hidden">
@@ -136,7 +129,7 @@ export default function Home() {
         <div className="container px-4 mx-auto">
           <h2 className="text-3xl font-bold mb-4 text-center">Popular Cities</h2>
           <p className="text-muted-foreground text-lg text-center mb-12 max-w-2xl mx-auto">Find the best PG accommodations in India's top educational and IT hubs.</p>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {(cities || [
               { city: 'Bangalore', count: 120 },
@@ -146,14 +139,14 @@ export default function Home() {
               { city: 'Hyderabad', count: 70 },
               { city: 'Chennai', count: 65 }
             ]).slice(0, 8).map((cityItem) => (
-              <Link 
-                key={cityItem.city} 
+              <Link
+                key={cityItem.city}
                 href={`/properties?city=${encodeURIComponent(cityItem.city)}`}
                 className="group relative overflow-hidden rounded-xl aspect-[4/3] flex items-end p-6 border bg-card hover:border-primary transition-colors"
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
-                <img 
-                  src={`https://picsum.photos/seed/${cityItem.city}/400/300`} 
+                <img
+                  src={`https://picsum.photos/seed/${cityItem.city}/400/300`}
                   alt={cityItem.city}
                   className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
@@ -174,10 +167,10 @@ export default function Home() {
             <h2 className="text-3xl font-bold mb-4">How RentKaro Works</h2>
             <p className="text-muted-foreground text-lg">We've simplified the process of finding your perfect PG accommodation. No brokers, no hidden fees, just straightforward renting.</p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
             <div className="hidden md:block absolute top-12 left-[16.66%] right-[16.66%] h-0.5 bg-muted-foreground/20 -z-10" />
-            
+
             <div className="text-center space-y-4">
               <div className="w-24 h-24 mx-auto bg-primary/10 rounded-2xl flex items-center justify-center text-primary rotate-3">
                 <Search className="w-10 h-10" />
@@ -185,7 +178,7 @@ export default function Home() {
               <h3 className="text-xl font-bold">1. Search & Filter</h3>
               <p className="text-muted-foreground">Browse thousands of verified PGs based on your preferred location, budget, and amenities.</p>
             </div>
-            
+
             <div className="text-center space-y-4">
               <div className="w-24 h-24 mx-auto bg-primary/10 rounded-2xl flex items-center justify-center text-primary -rotate-3">
                 <CheckCircle className="w-10 h-10" />
@@ -193,7 +186,7 @@ export default function Home() {
               <h3 className="text-xl font-bold">2. Select & Verify</h3>
               <p className="text-muted-foreground">Check real photos, read reviews, and see sentiment scores to make an informed decision.</p>
             </div>
-            
+
             <div className="text-center space-y-4">
               <div className="w-24 h-24 mx-auto bg-primary/10 rounded-2xl flex items-center justify-center text-primary rotate-3">
                 <HomeIcon className="w-10 h-10" />

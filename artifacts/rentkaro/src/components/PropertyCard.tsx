@@ -1,24 +1,45 @@
-import { Property } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Users, Bed, Star, ShieldCheck } from "lucide-react";
 import { SentimentBadge } from "./SentimentBadge";
 
+interface Property {
+  _id: string;
+  title: string;
+  description: string;
+  city: string;
+  address: string;
+  rent: number;
+  deposit: number;
+  genderPreference: string;
+  roomType: string;
+  amenities: string[];
+  images: string[];
+  availability: boolean;
+  viewCount?: number;
+  ownerName?: string;
+  ownerPhone?: string;
+  rating?: number | null;
+  reviewCount?: number;
+  sentimentScore?: number | null;
+  createdAt?: number;
+}
+
 export function PropertyCard({ property }: { property: Property }) {
   return (
-    <Link href={`/properties/${property.id}`} className="group h-full flex block">
+    <Link href={`/properties/${property._id}`} className="group h-full flex block">
       <Card className="w-full flex flex-col overflow-hidden transition-all hover:shadow-md hover:border-primary/50 cursor-pointer">
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
           {property.images && property.images.length > 0 ? (
-            <img 
-              src={property.images[0]} 
+            <img
+              src={property.images[0]}
               alt={property.title}
               className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <img 
-              src={`https://picsum.photos/seed/${property.id}/600/400`} 
+            <img
+              src={`https://picsum.photos/seed/${property._id}/600/400`}
               alt={property.title}
               className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
             />
@@ -45,7 +66,7 @@ export function PropertyCard({ property }: { property: Property }) {
             <MapPin className="w-3 h-3 shrink-0" />
             {property.address}, {property.city}
           </p>
-          
+
           <div className="flex flex-wrap gap-2 mt-auto pt-2">
             <Badge variant="outline" className="text-xs bg-muted/50 capitalize font-medium flex items-center gap-1">
               <Bed className="w-3 h-3" />

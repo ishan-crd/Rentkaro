@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Layout } from "@/components/layout/Layout";
@@ -31,9 +31,10 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 export default function ProfilePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const updateProfile = useMutation(api.users.updateProfile);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -44,20 +45,10 @@ export default function ProfilePage() {
   });
 
   const onSubmit = async (data: ProfileFormValues) => {
+    if (!user) return;
     setIsSaving(true);
     try {
-      const resp = await fetch("/api/auth/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.error || "Failed to update profile");
-      }
-      const updated = await resp.json();
-      queryClient.setQueryData(getGetMeQueryKey(), updated);
+      await updateProfile({ userId: user._id, name: data.name, phone: data.phone });
       toast({ title: "Profile updated successfully" });
       setIsEditing(false);
     } catch (err: any) {
@@ -168,7 +159,7 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">Member Since</p>
-                    <p className="font-medium">{new Date(user.createdAt).toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}</p>
+                    <p className="font-medium">{new Date(user._creationTime).toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}</p>
                   </div>
                 </div>
               </div>

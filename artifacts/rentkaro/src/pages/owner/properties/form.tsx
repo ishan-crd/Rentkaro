@@ -1,16 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { 
-  useCreateProperty, 
-  useGetProperty, 
-  useUpdateProperty,
-  getGetPropertyQueryKey,
-  getGetMyPropertiesQueryKey
-} from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
+import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -32,8 +28,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
 const COMMON_AMENITIES = [
-  "WiFi", "AC", "Washing Machine", "Power Backup", 
-  "Food Included", "Attached Bathroom", "Daily Cleaning", 
+  "WiFi", "AC", "Washing Machine", "Power Backup",
+  "Food Included", "Attached Bathroom", "Daily Cleaning",
   "Security", "Lift", "Parking", "TV", "Fridge"
 ];
 
@@ -57,19 +53,19 @@ export default function PropertyForm() {
   const [, setLocation] = useLocation();
   const [matchAdd] = useRoute("/owner/properties/add");
   const [matchEdit, params] = useRoute("/owner/properties/:id/edit");
-  const propertyId = Number(params?.id);
+  const propertyId = params?.id as Id<"properties"> | undefined;
   const isEditMode = matchEdit && !!propertyId;
 
+  const { userId } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const initializedForId = useRef<number | null>(null);
+  const initializedForId = useRef<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: property, isLoading: isFetching } = useGetProperty(propertyId, {
-    query: {
-      enabled: isEditMode,
-      queryKey: getGetPropertyQueryKey(propertyId)
-    }
-  });
+  const property = useQuery(api.properties.get, propertyId ? { id: propertyId } : "skip");
+  const isFetching = isEditMode && property === undefined;
+
+  const createProperty = useMutation(api.properties.create);
+  const updateProperty = useMutation(api.properties.update);
 
   const form = useForm<PropertyFormValues>({
     resolver: zodResolver(propertySchema),
@@ -89,8 +85,8 @@ export default function PropertyForm() {
   });
 
   useEffect(() => {
-    if (isEditMode && property && initializedForId.current !== property.id) {
-      initializedForId.current = property.id;
+    if (isEditMode && property && initializedForId.current !== property._id) {
+      initializedForId.current = property._id;
       form.reset({
         title: property.title,
         description: property.description,
@@ -107,22 +103,7 @@ export default function PropertyForm() {
     }
   }, [property, isEditMode, form]);
 
-  const createMutation = useCreateProperty({
-    mutation: {
-      onSuccess: () => {
-        toast({ title: "Property listed successfully!" });
-        queryClient.invalidateQueries({ queryKey: getGetMyPropertiesQueryKey() });
-        setLocation("/owner/properties");
-      },
-      onError: (err: any) => {
-        toast({ variant: "destructive", title: "Failed to list property", description: err.error });
-      }
-    }
-  });
-
-  const updateMutation = useUpdateProperty();
-
-  const onSubmit = (data: PropertyFormValues) => {
+  const onSubmit = async (data: PropertyFormValues) => {
     // For demo purposes, auto-generate images if none provided
     const payload = {
       ...data,
@@ -133,27 +114,23 @@ export default function PropertyForm() {
       ]
     };
 
-    if (isEditMode) {
-      updateMutation.mutate(
-        { id: propertyId, data: payload },
-        {
-          onSuccess: () => {
-            toast({ title: "Property updated successfully!" });
-            queryClient.invalidateQueries({ queryKey: getGetMyPropertiesQueryKey() });
-            queryClient.invalidateQueries({ queryKey: getGetPropertyQueryKey(propertyId) });
-            setLocation("/owner/properties");
-          },
-          onError: (err: any) => {
-            toast({ variant: "destructive", title: "Update failed", description: err.error });
-          }
-        }
-      );
-    } else {
-      createMutation.mutate({ data: payload });
+    setIsSubmitting(true);
+    try {
+      if (isEditMode) {
+        await updateProperty({ id: propertyId, ...payload });
+        toast({ title: "Property updated successfully!" });
+        setLocation("/owner/properties");
+      } else {
+        await createProperty({ ...payload, ownerId: userId! });
+        toast({ title: "Property listed successfully!" });
+        setLocation("/owner/properties");
+      }
+    } catch (err: any) {
+      toast({ variant: "destructive", title: isEditMode ? "Update failed" : "Failed to list property", description: err.message || err.error });
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   if (isEditMode && isFetching) {
     return (
@@ -169,7 +146,7 @@ export default function PropertyForm() {
         <Button variant="ghost" className="mb-6 -ml-4" onClick={() => setLocation("/owner/properties")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Properties
         </Button>
-        
+
         <h1 className="text-3xl font-bold mb-8">{isEditMode ? 'Edit Property' : 'List New Property'}</h1>
 
         <Form {...form}>
@@ -193,7 +170,7 @@ export default function PropertyForm() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="description"
@@ -201,10 +178,10 @@ export default function PropertyForm() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Describe the atmosphere, nearby landmarks, transport access..." 
+                        <Textarea
+                          placeholder="Describe the atmosphere, nearby landmarks, transport access..."
                           className="min-h-[120px]"
-                          {...field} 
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />

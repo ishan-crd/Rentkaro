@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Home, LayoutDashboard, CalendarDays, LogOut, Menu, Search, UserCircle } from "lucide-react";
 import {
@@ -20,20 +19,9 @@ export function Navbar() {
   const [, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const logoutMutation = useLogout({
-    mutation: {
-      onSuccess: () => {
-        contextLogout();
-        toast({ title: "Logged out successfully" });
-      },
-      onError: (err: any) => {
-        toast({ variant: "destructive", title: "Error", description: err.message || "Failed to log out" });
-      },
-    },
-  });
-
   const handleLogout = () => {
-    logoutMutation.mutate();
+    contextLogout();
+    toast({ title: "Logged out successfully" });
     setMobileOpen(false);
   };
 
@@ -131,7 +119,6 @@ export function Navbar() {
                   <DropdownMenuItem
                     className="cursor-pointer text-destructive focus:text-destructive"
                     onClick={handleLogout}
-                    disabled={logoutMutation.isPending}
                   >
                     <LogOut className="mr-2 h-4 w-4" />
                     Log out
@@ -238,11 +225,10 @@ export function Navbar() {
                     <div className="my-2 h-px bg-border" />
                     <button
                       onClick={handleLogout}
-                      disabled={logoutMutation.isPending}
                       className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors w-full text-left"
                     >
                       <LogOut className="h-4 w-4" />
-                      {logoutMutation.isPending ? "Logging out..." : "Log out"}
+                      Log out
                     </button>
                   </>
                 )}

@@ -1,4 +1,6 @@
-import { useGetOwnerStats, getGetOwnerStatsQueryKey } from "@workspace/api-client-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { useAuth } from "@/lib/auth";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,9 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Home, Inbox, Star, CalendarDays, Plus, Eye, CheckCircle2 } from "lucide-react";
 
 export default function OwnerDashboard() {
-  const { data: stats, isLoading } = useGetOwnerStats({
-    query: { queryKey: getGetOwnerStatsQueryKey() }
-  });
+  const { userId } = useAuth();
+  const stats = useQuery(api.stats.ownerStats, userId ? { ownerId: userId } : "skip");
+  const isLoading = stats === undefined;
 
   return (
     <Layout>
@@ -66,7 +68,7 @@ export default function OwnerDashboard() {
                   <div className="text-xs text-muted-foreground mt-1">Across all listings</div>
                 </CardContent>
               </Card>
-              
+
               <Card className="border-l-4 border-l-orange-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Inquiries</CardTitle>
@@ -115,8 +117,8 @@ export default function OwnerDashboard() {
                 <CardContent>
                   {stats.recentInquiries && stats.recentInquiries.length > 0 ? (
                     <div className="space-y-4">
-                      {stats.recentInquiries.slice(0, 5).map(inquiry => (
-                        <div key={inquiry.id} className="flex flex-col sm:flex-row justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      {stats.recentInquiries.slice(0, 5).map((inquiry: any) => (
+                        <div key={inquiry._id} className="flex flex-col sm:flex-row justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                           <div>
                             <div className="font-medium">{inquiry.tenantName}</div>
                             <div className="text-sm text-primary font-medium mt-1">{inquiry.propertyTitle}</div>
@@ -124,8 +126,8 @@ export default function OwnerDashboard() {
                           </div>
                           <div className="flex flex-col items-start sm:items-end justify-between mt-3 sm:mt-0">
                             <Badge variant={
-                              inquiry.status === 'pending' ? 'secondary' : 
-                              inquiry.status === 'approved' ? 'default' : 
+                              inquiry.status === 'pending' ? 'secondary' :
+                              inquiry.status === 'approved' ? 'default' :
                               'destructive'
                             } className={inquiry.status === 'approved' ? 'bg-green-500 hover:bg-green-600' : ''}>
                               {inquiry.status}

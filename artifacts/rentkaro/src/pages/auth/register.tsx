@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useLocation } from "wouter";
-import { useRegister, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useAction } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -32,8 +34,11 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function Register() {
   const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
+  const authContext = useAuth();
   const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const registerAction = useAction(api.auth.register);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -46,31 +51,33 @@ export default function Register() {
     },
   });
 
-  const registerMutation = useRegister({
-    mutation: {
-      onSuccess: (data) => {
-        toast({ title: "Account created!", description: "Welcome to RentKaro." });
-        queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-        queryClient.setQueryData(getGetMeQueryKey(), data.user);
-        
-        if (data.user.role === "owner") {
-          setLocation("/owner/dashboard");
-        } else {
-          setLocation("/properties");
-        }
-      },
-      onError: (error: any) => {
-        toast({ 
-          variant: "destructive", 
-          title: "Registration failed", 
-          description: error.error || "An error occurred during registration." 
-        });
-      }
-    }
-  });
+  const onSubmit = async (data: RegisterFormValues) => {
+    setIsPending(true);
+    try {
+      const user = await registerAction({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        phone: data.phone,
+        role: data.role,
+      });
+      authContext.login(user);
+      toast({ title: "Account created!", description: "Welcome to RentKaro." });
 
-  const onSubmit = (data: RegisterFormValues) => {
-    registerMutation.mutate({ data });
+      if (user.role === "owner") {
+        setLocation("/owner/dashboard");
+      } else {
+        setLocation("/properties");
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Registration failed",
+        description: error.message || "An error occurred during registration.",
+      });
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -140,14 +147,14 @@ export default function Register() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="name@example.com" 
-                          type="email" 
+                        <Input
+                          placeholder="name@example.com"
+                          type="email"
                           autoCapitalize="none"
                           autoComplete="email"
                           autoCorrect="off"
                           data-testid="input-email"
-                          {...field} 
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -174,24 +181,24 @@ export default function Register() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="••••••••" 
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
                           data-testid="input-password"
-                          {...field} 
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button 
-                  type="submit" 
-                  className="w-full mt-6" 
-                  disabled={registerMutation.isPending}
+                <Button
+                  type="submit"
+                  className="w-full mt-6"
+                  disabled={isPending}
                   data-testid="button-submit"
                 >
-                  {registerMutation.isPending ? (
+                  {isPending ? (
                     <span className="flex items-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
                       Creating account...

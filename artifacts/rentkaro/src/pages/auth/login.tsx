@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useLocation } from "wouter";
-import { useLogin, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useAction } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -28,8 +30,11 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
+  const authContext = useAuth();
   const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const loginAction = useAction(api.auth.login);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -39,31 +44,27 @@ export default function Login() {
     },
   });
 
-  const loginMutation = useLogin({
-    mutation: {
-      onSuccess: (data) => {
-        toast({ title: "Welcome back!", description: "You have successfully logged in." });
-        queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-        queryClient.setQueryData(getGetMeQueryKey(), data.user);
-        
-        if (data.user.role === "owner") {
-          setLocation("/owner/dashboard");
-        } else {
-          setLocation("/properties");
-        }
-      },
-      onError: (error: any) => {
-        toast({ 
-          variant: "destructive", 
-          title: "Login failed", 
-          description: error.error || "Please check your credentials and try again." 
-        });
-      }
-    }
-  });
+  const onSubmit = async (data: LoginFormValues) => {
+    setIsPending(true);
+    try {
+      const user = await loginAction({ email: data.email, password: data.password });
+      authContext.login(user);
+      toast({ title: "Welcome back!", description: "You have successfully logged in." });
 
-  const onSubmit = (data: LoginFormValues) => {
-    loginMutation.mutate({ data });
+      if (user.role === "owner") {
+        setLocation("/owner/dashboard");
+      } else {
+        setLocation("/properties");
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: error.message || "Please check your credentials and try again.",
+      });
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -89,14 +90,14 @@ export default function Login() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="name@example.com" 
-                          type="email" 
+                        <Input
+                          placeholder="name@example.com"
+                          type="email"
                           autoCapitalize="none"
                           autoComplete="email"
                           autoCorrect="off"
                           data-testid="input-email"
-                          {...field} 
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -115,24 +116,24 @@ export default function Login() {
                         </Link>
                       </div>
                       <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="••••••••" 
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
                           data-testid="input-password"
-                          {...field} 
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button 
-                  type="submit" 
-                  className="w-full mt-6" 
-                  disabled={loginMutation.isPending}
+                <Button
+                  type="submit"
+                  className="w-full mt-6"
+                  disabled={isPending}
                   data-testid="button-submit"
                 >
-                  {loginMutation.isPending ? (
+                  {isPending ? (
                     <span className="flex items-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
                       Signing in...
